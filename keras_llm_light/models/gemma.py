@@ -1,4 +1,3 @@
-import logging
 from typing import Union
 
 from keras_llm_light import blocks_ops
@@ -14,8 +13,6 @@ import keras_nlp
 import tensorflow as tf
 import numpy as np
 
-LOGGER = logging.getLogger(__name__)
-LOGGER.setLevel(logging.INFO)
 
 DUMMY_SEQUENCE_LENGTH = 64
 
