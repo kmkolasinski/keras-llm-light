@@ -56,6 +56,9 @@ class Variable:
     def get_memory_usage(self) -> float:
         return mb_used(self._value)
 
+    def get_fp32_memory_usage(self) -> float:
+        return mb_used(tf.cast(self._value, tf.float32))
+
 
 class FP16Variable(Variable):
     def __init__(
@@ -96,7 +99,9 @@ class Int8Variable(Variable):
         name = get_variable_name(variable)
         w_src = variable.numpy()
         min_val = np.percentile(w_src, self._percentile, method=self._percentile_method)
-        max_val = np.percentile(w_src, 100 - self._percentile, method=self._percentile_method)
+        max_val = np.percentile(
+            w_src, 100 - self._percentile, method=self._percentile_method
+        )
         scale = np.maximum(max_val - min_val, 1e-6)
         w = np.clip(w_src, min_val, max_val)
         w_uint8 = np.round((w - min_val) / scale * 255).astype(np.uint8)

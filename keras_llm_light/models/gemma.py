@@ -77,11 +77,13 @@ def build_block_wise_gemma(
     ]
     print("Single block trainable weights:")
     for v in trainable_weights:
-        print(f"- {v.path}")
+        print(f"- {v.path} {v.shape.as_list()}")
 
     print("Collecting transformer block weights ...")
     blocks_weights = []
-    for block in tqdm(gemma_llm.backbone.transformer_layers, desc="Preparing/Quantizing weights"):
+    for block in tqdm(
+        gemma_llm.backbone.transformer_layers, desc="Preparing/Quantizing weights"
+    ):
         block_weights = []
         for w in block.weights:
             if "lora_" in w.path:

@@ -71,6 +71,22 @@ class TestVariables(tf.test.TestCase):
         )
         self.assertAllEqual(variable._max_indices, tf.Variable([[9]], dtype=tf.int64))
 
+    def test_Int8Variable_with_percentile_error(self):
+        array = np.random.uniform(0, 1, size=(1000, 1000)).astype(np.float16)
+        array[array > 0.99] *= 100.0
+        test_vectors = np.random.uniform(-1, 1, size=(1000, 1000)).astype(np.float16)
+
+        input_variable = tf.Variable(array)
+        variable_no_outliers = vars.Int8Variable(input_variable, percentile=0)
+        variable_with_outliers = vars.Int8Variable(input_variable, percentile=1)
+
+        exact_result = array @ test_vectors
+        no_outliers_result = variable_no_outliers.get_value().numpy() @ test_vectors
+        with_outliers_result = variable_with_outliers.get_value().numpy() @ test_vectors
+        error_0 = np.abs(exact_result - no_outliers_result).mean()
+        error_1 = np.abs(exact_result - with_outliers_result).mean()
+        self.assertGreater(error_0 / error_1, 10)
+
     def test_pack_and_unpack_int4_to_int8(self):
 
         array = np.array(range(16), dtype=np.uint8)

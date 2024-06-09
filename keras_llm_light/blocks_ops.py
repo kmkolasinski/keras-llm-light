@@ -31,18 +31,28 @@ class ModelBlock:
 
     def print_weights_memory_usage(self):
         block_weights = self.blocks_weights[0]
-        total_memory = 0
-        print("Single block memory usage:")
+        from rich.console import Console
+        from rich.table import Table
+
+        table = Table(title=f"Block Memory Usage (Num blocks {self.num_blocks})")
+        table.add_column("Tensor", justify="right", style="cyan", no_wrap=True)
+        table.add_column("Shape", justify="right", style="magenta")
+        table.add_column("dtype", justify="right", style="green")
+        table.add_column("Mem Usage [MB]", justify="right", style="green")
+        table.add_column("FP32 Mem Usage [MB]", justify="right", style="green")
+        table.add_column("Trainable", justify="right", style="green")
         for layer_weight, block_weight in zip(self.block_layer.weights, block_weights):
-            memory_usage = block_weight.get_memory_usage()
-            total_memory += memory_usage
-            print(
-                f" - {layer_weight.path:<60} => {memory_usage:6.3f} MB  {block_weight.dtype.name}"
+            table.add_row(
+                layer_weight.path,
+                str(block_weight.shape.as_list()),
+                block_weight.dtype.name,
+                f"{block_weight.get_memory_usage():.3f}",
+                f"{block_weight.get_fp32_memory_usage():.3f}",
+                str(block_weight.trainable),
             )
-        print(
-            f"Memory usage per single block: {total_memory:6.3f} "
-            f"MB (num blocks = {self.num_blocks}). Total memory usage: {total_memory * self.num_blocks:6.3f} MB"
-        )
+
+        console = Console()
+        console.print(table)
 
     @tf.function(jit_compile=True)
     def assign_block_weights(self, block_id: int):
@@ -169,7 +179,10 @@ class LLM:
         token_id = tf.argmax(scores)
         return token_id
 
-    def generate(self, prompt: str, max_length: int = 512) -> tf.Tensor:
+    def generate(
+        self, prompt: str, max_length: int = 512, verbose: bool = True
+    ) -> tf.Tensor:
+
         inputs = self.preprocessor.generate_preprocess(
             prompt, sequence_length=max_length
         )
@@ -179,10 +192,11 @@ class LLM:
         predictions = []
         index = padding_mask[0].sum()
         if index >= max_length:
-            print(f"Prompt is too long: {index} >= {max_length}")
+            print(f"Prompt is too long >{max_length} (Max Length), prompt: {prompt}")
             return tf.constant("")
-        pbar = tqdm(total=max_length - index, desc="Generating text")
-        pbar.update(index)
+        if verbose:
+            pbar = tqdm(total=max_length, desc="Generating text")
+            pbar.update(index)
         while True:
             outputs, _ = self.forward(token_id_input, padding_mask)
             next_token = self.predict_next_token(outputs[0, index - 1]).numpy()
@@ -196,8 +210,10 @@ class LLM:
                 break
 
             predictions.append(next_token)
-            pbar.update()
-
+            if verbose:
+                pbar.update()
+        if len(predictions) == 0:
+            return tf.constant("")
         return self.preprocessor.tokenizer.detokenize(predictions)
 
 
