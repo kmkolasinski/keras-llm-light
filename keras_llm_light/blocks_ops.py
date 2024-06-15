@@ -267,7 +267,7 @@ class Trainer:
             initial_gradients = tf.cast(initial_gradients, tf.float16)
 
         if update_accuracy:
-            self.accuracy.update_state(labels, logits)
+            self.accuracy.update_state(labels, logits, sample_weight=sample_weight)
         return loss, self.accuracy.result(), initial_gradients
 
     def train_loss_step(
@@ -311,34 +311,42 @@ class Trainer:
     def fit(
         self,
         model: LLM,
-        train_dataset,
+        train_dataset: tf.data.Dataset,
         epochs: int = 1,
         steps_per_epoch: int = 1000,
         num_loss_splits: int = 2,
-    ):
+    ) -> dict[str, list[float]]:
         metrics_hist = defaultdict(list)
 
+        pbar = tqdm(total=steps_per_epoch, desc="Training")
         for epoch in range(epochs):
+
+            self.accuracy.reset_state()
+            pbar.set_description(f"Epoch {epoch + 1}/{epochs}")
+            pbar.reset()
+
             for i, documents in tqdm(enumerate(train_dataset)):
                 if i >= steps_per_epoch:
                     break
+
                 features, labels, sample_weight = documents
-                token_id_input = features["token_ids"]
+                token_ids = features["token_ids"]
                 padding_mask = features["padding_mask"]
 
-                outputs, _ = model.forward(token_id_input, padding_mask)
+                outputs, _ = model.forward(token_ids, padding_mask)
 
-                loss_value, accuracy_value, initial_gradients = self.train_loss_step(
+                loss_val, accuracy_val, output_grads = self.train_loss_step(
                     outputs, labels, sample_weight, num_splits=num_loss_splits
                 )
-                vars_gradients = model.backward(padding_mask, initial_gradients)
+                vars_gradients = model.backward(padding_mask, output_grads)
 
                 # tf function requires flat list of tensors
                 self.apply_gradients(list(chain.from_iterable(vars_gradients)))
 
-                if i % 10 == 0:
-                    print(epoch, i, loss_value.numpy(), accuracy_value.numpy())
-                metrics_hist["loss"].append(loss_value.numpy())
-                metrics_hist["accuracy"].append(accuracy_value.numpy())
-            print(epoch, loss_value.numpy(), accuracy_value.numpy())
+                metrics = {"loss": loss_val.numpy(), "accuracy": accuracy_val.numpy()}
+                pbar.update(1)
+                pbar.set_postfix(metrics)
+
+                for k, v in metrics.items():
+                    metrics_hist[k].append(v)
         return metrics_hist

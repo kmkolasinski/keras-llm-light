@@ -187,3 +187,5 @@ generated_text = llm.generate("Example text ...")
 * https://www.kaggle.com/code/nilaychauhan/fine-tune-gemma-models-in-keras-using-lora
 * https://medium.com/tensorflow/fitting-larger-networks-into-memory-583e3c758ff9
 * https://huggingface.co/blog/hf-bitsandbytes-integration
+* https://rahulschand.github.io/gpu_poor/
+* https://medium.com/@dillipprasad60/qlora-explained-a-deep-dive-into-parametric-efficient-fine-tuning-in-large-language-models-llms-c1a4794b1766
